@@ -3,43 +3,86 @@ package log
 import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"gopkg.in/natefinch/lumberjack.v2"
 )
 
-func InitLogger(logLevel string, logPath string, maxSize int, maxAge int, compress bool) *zap.Logger {
-	debugWriteSyncer := newLogWriter(logPath+".debug.log", maxSize, maxAge, compress)
-	infoWriteSyncer := newLogWriter(logPath+".info.log", maxSize, maxAge, compress)
-	warnWriteSyncer := newLogWriter(logPath+".warn.log", maxSize, maxAge, compress)
-	errorWriteSyncer := newLogWriter(logPath+".error.log", maxSize, maxAge, compress)
+type Option struct {
+	LogLevel   string
+	Format     string
+	LogPath    string
+	MaxSize    int
+	MaxAge     int
+	MaxBackups int
+	Compress   bool
+}
 
-	encoder := newEncoder()
+func NewOptions() *Option {
+	return &Option{
+		LogLevel:   "info",
+		Format:     "console",
+		LogPath:    "logger",
+		MaxSize:    100,
+		MaxAge:     7,
+		MaxBackups: 10,
+		Compress:   false,
+	}
+}
 
-	debugCore := zapcore.NewCore(encoder, debugWriteSyncer, newLevelEnablerFunc(zapcore.DebugLevel))
-	infoCore := zapcore.NewCore(encoder, infoWriteSyncer, newLevelEnablerFunc(zapcore.InfoLevel))
-	warnCore := zapcore.NewCore(encoder, warnWriteSyncer, newLevelEnablerFunc(zapcore.WarnLevel))
-	errorCore := zapcore.NewCore(encoder, errorWriteSyncer, newLevelEnablerFunc(zapcore.ErrorLevel))
+func InitLogger(opt *Option) *zap.Logger {
+	encoder := newEncoder(opt.Format)
 
-	tee := zapcore.NewTee(debugCore, infoCore, warnCore, errorCore)
+	cores := []zapcore.Core{
+		zapcore.NewCore(encoder, newLogWriter("debug", opt), newLevelEnablerFunc(zapcore.DebugLevel)),
+		zapcore.NewCore(encoder, newLogWriter("info", opt), newLevelEnablerFunc(zapcore.InfoLevel)),
+		zapcore.NewCore(encoder, newLogWriter("warn", opt), newLevelEnablerFunc(zapcore.WarnLevel)),
+		zapcore.NewCore(encoder, newLogWriter("error", opt), newLevelEnablerFunc(zapcore.ErrorLevel)),
+	}
+
+	switch opt.LogLevel {
+	case "debug", "DEBUG":
+		cores = cores[:]
+	case "info", "INFO":
+		cores = cores[1:]
+	case "warn", "WARN":
+		cores = cores[2:]
+	case "error", "ERROR":
+		cores = cores[3:]
+	default:
+	}
+
+	tee := zapcore.NewTee(cores...)
 
 	logger := zap.New(tee, zap.AddCaller())
 	return logger
 }
 
-func newEncoder() zapcore.Encoder {
+func newEncoder(format string) zapcore.Encoder {
 	encoderConfig := zap.NewProductionEncoderConfig()
+
 	encoderConfig.EncodeTime = zapcore.RFC3339TimeEncoder
 	encoderConfig.EncodeLevel = zapcore.CapitalLevelEncoder
-	return zapcore.NewConsoleEncoder(encoderConfig)
+
+	switch format {
+	case "json", "JSON":
+		return zapcore.NewJSONEncoder(encoderConfig)
+	case "console", "text", "TEXT":
+		return zapcore.NewConsoleEncoder(encoderConfig)
+	default:
+		return zapcore.NewConsoleEncoder(encoderConfig)
+	}
 }
 
-func newLogWriter(logPath string, maxSize int, maxAge int, compress bool) zapcore.WriteSyncer {
-	lumberJackLogger := &lumberjack.Logger{
-		Filename: logPath,
-		MaxSize:  maxSize,
-		MaxAge:   maxAge,
-		Compress: compress,
+func newLogWriter(level string, opt *Option) zapcore.WriteSyncer {
+	filename := opt.LogPath + "." + level + ".log"
+
+	logger := &Logger{
+		Filename:   filename,
+		MaxSize:    opt.MaxSize,
+		MaxAge:     opt.MaxAge,
+		MaxBackups: opt.MaxBackups,
+		Compress:   opt.Compress,
 	}
-	return zapcore.AddSync(lumberJackLogger)
+
+	return zapcore.AddSync(logger)
 }
 
 func newLevelEnablerFunc(l zapcore.Level) zap.LevelEnablerFunc {
