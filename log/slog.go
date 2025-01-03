@@ -41,7 +41,7 @@ func (h *handler) WithGroup(name string) slog.Handler {
 	return h
 }
 
-func newHandler(opts *Options, slogOpts *slog.HandlerOptions) *handler {
+func newSlogHandler(opts *Options, slogOpts *slog.HandlerOptions) *handler {
 	h := &handler{
 		level:       convertToSlogLevel(opts.Level),
 		writers:     make(map[slog.Level]*Logger),
@@ -76,10 +76,10 @@ func NewSlogLogger(opts *Options) *slog.Logger {
 	slogOpts := &slog.HandlerOptions{
 		AddSource:   true,
 		Level:       convertToSlogLevel(opts.Level),
-		ReplaceAttr: newReplaceAttr(),
+		ReplaceAttr: newSlogReplaceAttr(),
 	}
 
-	logger := slog.New(newHandler(opts, slogOpts))
+	logger := slog.New(newSlogHandler(opts, slogOpts))
 	return logger
 }
 
@@ -98,7 +98,7 @@ func convertToSlogLevel(level string) slog.Level {
 	}
 }
 
-func newReplaceAttr() func(groups []string, a slog.Attr) slog.Attr {
+func newSlogReplaceAttr() func(groups []string, a slog.Attr) slog.Attr {
 	return func(groups []string, a slog.Attr) slog.Attr {
 		if a.Key == slog.SourceKey {
 			source, ok := a.Value.Any().(*slog.Source)
