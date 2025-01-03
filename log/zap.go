@@ -5,39 +5,17 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-type Option struct {
-	LogLevel   string
-	Format     string
-	LogPath    string
-	MaxSize    int
-	MaxAge     int
-	MaxBackups int
-	Compress   bool
-}
-
-func NewOptions() *Option {
-	return &Option{
-		LogLevel:   "info",
-		Format:     "console",
-		LogPath:    "logger",
-		MaxSize:    100,
-		MaxAge:     7,
-		MaxBackups: 10,
-		Compress:   false,
-	}
-}
-
-func InitLogger(opt *Option) *zap.Logger {
-	encoder := newEncoder(opt.Format)
+func NewZapLogger(opts *Options) *zap.Logger {
+	encoder := newEncoder(opts.Format)
 
 	cores := []zapcore.Core{
-		zapcore.NewCore(encoder, newLogWriter("debug", opt), newLevelEnablerFunc(zapcore.DebugLevel)),
-		zapcore.NewCore(encoder, newLogWriter("info", opt), newLevelEnablerFunc(zapcore.InfoLevel)),
-		zapcore.NewCore(encoder, newLogWriter("warn", opt), newLevelEnablerFunc(zapcore.WarnLevel)),
-		zapcore.NewCore(encoder, newLogWriter("error", opt), newLevelEnablerFunc(zapcore.ErrorLevel)),
+		zapcore.NewCore(encoder, newLogWriter("DEBUG", opts), newLevelEnablerFunc(zapcore.DebugLevel)),
+		zapcore.NewCore(encoder, newLogWriter("INFO", opts), newLevelEnablerFunc(zapcore.InfoLevel)),
+		zapcore.NewCore(encoder, newLogWriter("WARN", opts), newLevelEnablerFunc(zapcore.WarnLevel)),
+		zapcore.NewCore(encoder, newLogWriter("ERROR", opts), newLevelEnablerFunc(zapcore.ErrorLevel)),
 	}
 
-	switch opt.LogLevel {
+	switch opts.Level {
 	case "debug", "DEBUG":
 		cores = cores[:]
 	case "info", "INFO":
@@ -71,15 +49,15 @@ func newEncoder(format string) zapcore.Encoder {
 	}
 }
 
-func newLogWriter(level string, opt *Option) zapcore.WriteSyncer {
-	filename := opt.LogPath + "." + level + ".log"
+func newLogWriter(level string, opts *Options) zapcore.WriteSyncer {
+	filename := opts.Path + "." + level + ".log"
 
 	logger := &Logger{
 		Filename:   filename,
-		MaxSize:    opt.MaxSize,
-		MaxAge:     opt.MaxAge,
-		MaxBackups: opt.MaxBackups,
-		Compress:   opt.Compress,
+		MaxSize:    opts.MaxSize,
+		MaxAge:     opts.MaxAge,
+		MaxBackups: opts.MaxBackups,
+		Compress:   opts.Compress,
 	}
 
 	return zapcore.AddSync(logger)
