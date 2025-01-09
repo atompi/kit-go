@@ -2,14 +2,10 @@ package os
 
 import (
 	"bytes"
-	"os"
 	"os/exec"
-	"os/signal"
 	"os/user"
 	"strconv"
 	"syscall"
-
-	"go.uber.org/zap"
 )
 
 func ExecCmd(command string, username string) (result string, err error) {
@@ -35,12 +31,4 @@ func ExecCmd(command string, username string) (result string, err error) {
 
 	result = "stdout:\n" + stdoutBuf.String() + "\nstderr:\n" + stderrBuf.String()
 	return
-}
-
-func GracefulExit() {
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
-	s := <-c
-	zap.S().Warnf("a %v signal is received, exiting...", s)
-	os.Exit(0)
 }
