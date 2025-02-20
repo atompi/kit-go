@@ -8,8 +8,8 @@ import (
 
 type handler struct {
 	level       slog.Level
-	writers     map[slog.Level]*Logger
-	options     *Options
+	writers     map[slog.Level]*Rotater
+	logger      *Logger
 	slogOptions *slog.HandlerOptions
 }
 
@@ -18,14 +18,14 @@ func (h *handler) Enabled(ctx context.Context, level slog.Level) bool {
 }
 
 func (h *handler) Handle(ctx context.Context, r slog.Record) error {
-	writer := &Logger{}
-	if !h.options.MultiFiles {
-		writer = h.writers[convertToSlogLevel(h.options.Level)]
+	writer := &Rotater{}
+	if !h.logger.MultiFiles {
+		writer = h.writers[convertToSlogLevel(h.logger.Level)]
 	} else {
 		writer = h.writers[r.Level]
 	}
 
-	switch h.options.Format {
+	switch h.logger.Format {
 	case "json", "JSON":
 		return slog.NewJSONHandler(writer, h.slogOptions).Handle(ctx, r)
 	default:
@@ -41,46 +41,46 @@ func (h *handler) WithGroup(name string) slog.Handler {
 	return h
 }
 
-func newSlogHandler(opts *Options, slogOpts *slog.HandlerOptions) *handler {
+func newSlogHandler(logger *Logger, slogOptions *slog.HandlerOptions) *handler {
 	h := &handler{
-		level:       convertToSlogLevel(opts.Level),
-		writers:     make(map[slog.Level]*Logger),
-		options:     opts,
-		slogOptions: slogOpts,
+		level:       convertToSlogLevel(logger.Level),
+		writers:     make(map[slog.Level]*Rotater),
+		logger:      logger,
+		slogOptions: slogOptions,
 	}
 
-	if opts.MultiFiles {
+	if logger.MultiFiles {
 		for _, level := range []slog.Level{slog.LevelDebug, slog.LevelInfo, slog.LevelWarn, slog.LevelError} {
-			h.writers[level] = &Logger{
-				Filename:   opts.Path + "." + level.String() + ".log",
-				MaxSize:    opts.MaxSize,
-				MaxBackups: opts.MaxBackups,
-				MaxAge:     opts.MaxAge,
-				Compress:   opts.Compress,
+			h.writers[level] = &Rotater{
+				Filename:   logger.Path + "." + level.String() + ".log",
+				MaxSize:    logger.MaxSize,
+				MaxBackups: logger.MaxBackups,
+				MaxAge:     logger.MaxAge,
+				Compress:   logger.Compress,
 			}
 		}
 	} else {
-		h.writers[convertToSlogLevel(opts.Level)] = &Logger{
-			Filename:   opts.Path + ".log",
-			MaxSize:    opts.MaxSize,
-			MaxBackups: opts.MaxBackups,
-			MaxAge:     opts.MaxAge,
-			Compress:   opts.Compress,
+		h.writers[convertToSlogLevel(logger.Level)] = &Rotater{
+			Filename:   logger.Path + ".log",
+			MaxSize:    logger.MaxSize,
+			MaxBackups: logger.MaxBackups,
+			MaxAge:     logger.MaxAge,
+			Compress:   logger.Compress,
 		}
 	}
 
 	return h
 }
 
-func NewSlogLogger(opts *Options) *slog.Logger {
-	slogOpts := &slog.HandlerOptions{
+func NewSlogLogger(logger *Logger) *slog.Logger {
+	slogOptions := &slog.HandlerOptions{
 		AddSource:   true,
-		Level:       convertToSlogLevel(opts.Level),
+		Level:       convertToSlogLevel(logger.Level),
 		ReplaceAttr: newSlogReplaceAttr(),
 	}
 
-	logger := slog.New(newSlogHandler(opts, slogOpts))
-	return logger
+	slogger := slog.New(newSlogHandler(logger, slogOptions))
+	return slogger
 }
 
 func convertToSlogLevel(level string) slog.Level {

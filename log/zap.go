@@ -5,39 +5,39 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-func NewZapLogger(opts *Options) *zap.Logger {
-	encoder := newZapEncoder(opts.Format)
+func NewZapLogger(logger *Logger) *zap.Logger {
+	encoder := newZapEncoder(logger.Format)
 
-	writers := make(map[zapcore.Level]*Logger)
-	if opts.MultiFiles {
-		for _, level := range newZapLevels(opts.Level) {
-			writers[level] = &Logger{
-				Filename:   opts.Path + "." + level.CapitalString() + ".log",
-				MaxSize:    opts.MaxSize,
-				MaxBackups: opts.MaxBackups,
-				MaxAge:     opts.MaxAge,
-				Compress:   opts.Compress,
+	writers := make(map[zapcore.Level]*Rotater)
+	if logger.MultiFiles {
+		for _, level := range newZapLevels(logger.Level) {
+			writers[level] = &Rotater{
+				Filename:   logger.Path + "." + level.CapitalString() + ".log",
+				MaxSize:    logger.MaxSize,
+				MaxBackups: logger.MaxBackups,
+				MaxAge:     logger.MaxAge,
+				Compress:   logger.Compress,
 			}
 		}
 	} else {
-		writers[convertToZapLevel(opts.Level)] = &Logger{
-			Filename:   opts.Path + ".log",
-			MaxSize:    opts.MaxSize,
-			MaxBackups: opts.MaxBackups,
-			MaxAge:     opts.MaxAge,
+		writers[convertToZapLevel(logger.Level)] = &Rotater{
+			Filename:   logger.Path + ".log",
+			MaxSize:    logger.MaxSize,
+			MaxBackups: logger.MaxBackups,
+			MaxAge:     logger.MaxAge,
 		}
 	}
 
 	cores := make([]zapcore.Core, 0)
 	for level, writer := range writers {
-		core := zapcore.NewCore(encoder, zapcore.AddSync(writer), newZapLevelEnablerFunc(level, opts.MultiFiles))
+		core := zapcore.NewCore(encoder, zapcore.AddSync(writer), newZapLevelEnablerFunc(level, logger.MultiFiles))
 		cores = append(cores, core)
 	}
 
 	tee := zapcore.NewTee(cores...)
 
-	logger := zap.New(tee, zap.AddCaller())
-	return logger
+	zlogger := zap.New(tee, zap.AddCaller())
+	return zlogger
 }
 
 func newZapEncoder(format string) zapcore.Encoder {
